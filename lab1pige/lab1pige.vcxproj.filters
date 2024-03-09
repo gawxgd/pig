@@ -18,12 +18,18 @@
     <ClInclude Include="app.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="screenWindow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="app.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="screenWindow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

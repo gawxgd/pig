@@ -101,13 +101,16 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 		}
 		break;
 		case WM_HOTKEY:
-			switch (wparam)
+			switch (static_cast<int>(wparam))
 			{
 				case F4:
-					PostQuitMessage(EXIT_SUCCESS);
+					ShowErrorMessageBox(0);
+
+					//PostQuitMessage(EXIT_SUCCESS);
 					break;
 				case ALTC:
 					pulse = false;
+					ShowErrorMessageBox(0);
 					break;
 
 			}
@@ -126,6 +129,7 @@ HWND app::create_window(DWORD style)
 	int y = cursor_pos.y;
 	sizeCount = 1;
 	change = 100;
+	pulse = true;
 	HWND window = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT, s_class_name.c_str(), L"circle", style, x - 50 , y - 50 , 100, 100, nullptr, nullptr, m_instance, this);
 	//SetCapture(window);
 	SetTimer(window, ID_TIMER1, 5, NULL);
@@ -134,11 +138,12 @@ HWND app::create_window(DWORD style)
 	SetLayeredWindowAttributes(window, 0, 255 * 80 / 100, LWA_ALPHA);
 	SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 	SetWindowRgn(window, CreateEllipticRgn(0,0,100,100), TRUE);
+
 	return window;
 }
 void app::RegisterHot()
 {
-	if (RegisterHotKey(m_main, ALTC,MOD_ALT | MOD_SHIFT, 'C'))
+	if (RegisterHotKey(NULL, ALTC,MOD_ALT | MOD_SHIFT, 'C'))
 	{
 		// Hotkey registered successfully
 	}
@@ -146,7 +151,7 @@ void app::RegisterHot()
 	{
 		ShowErrorMessageBox(GetLastError());
 	}
-	if (RegisterHotKey(m_main, F4, MOD_ALT | MOD_SHIFT, VK_F4))
+	if (RegisterHotKey(NULL, F4, MOD_ALT | MOD_SHIFT, VK_F4))
 	{
 		// Hotkey registered successfully
 	}
@@ -157,7 +162,6 @@ void app::RegisterHot()
 }
 void app::ShowErrorMessageBox(DWORD errorCode)
 {
-	//zmienić na ładny format
 	LPVOID errorMsgBuffer = nullptr;
 
 	FormatMessage(
@@ -171,9 +175,12 @@ void app::ShowErrorMessageBox(DWORD errorCode)
 	);
 
 	// Display error message in MessageBox
+	WCHAR message[256];
+	swprintf_s(message, L"Failed with error %d:\n%s", errorCode, errorMsgBuffer ? static_cast<LPCWSTR>(errorMsgBuffer) : L"Unknown error");
+
 	MessageBox(
 		NULL,
-		errorMsgBuffer ? static_cast<LPCWSTR>(errorMsgBuffer) : L"Unknown error",
+		message,
 		L"Error",
 		MB_ICONERROR | MB_OK
 	);
@@ -181,9 +188,9 @@ void app::ShowErrorMessageBox(DWORD errorCode)
 	// Free the buffer allocated by FormatMessage
 	LocalFree(errorMsgBuffer);
 }
+
 app::app(HINSTANCE instance) : m_instance{ instance }
 {
-	pulse = true;
 	register_class();
 	DWORD main_style = WS_OVERLAPPED | WS_POPUP;
 	m_main = create_window(main_style);
@@ -201,6 +208,7 @@ int app::run(int show_command)
 	{
 		if (result == -1)
 			return EXIT_FAILURE;
+
 		TranslateMessage(&msg);
 		DispatchMessageW(&msg);
 
