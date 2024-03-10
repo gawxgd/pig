@@ -9,6 +9,8 @@
 #define ALTC 3
 
 std::wstring const app::s_class_name{ L"app window" };
+std::wstring const app::screen_class_name{ L"screen window" };
+
 bool app::register_class()
 {
 	WNDCLASSEXW desc{};
@@ -188,19 +190,23 @@ void app::ShowErrorMessageBox(DWORD errorCode)
 	// Free the buffer allocated by FormatMessage
 	LocalFree(errorMsgBuffer);
 }
-
 app::app(HINSTANCE instance) : m_instance{ instance }
 {
 	register_class();
+	registerScreen_class();
+	/*screenWindow sc{ instance };
+	screen = sc;
+	screen.register_class();
+	screen.create_screen_window();*/
 	DWORD main_style = WS_OVERLAPPED | WS_POPUP;
 	m_main = create_window(main_style);
+	create_screen_window();
 }
 
 int app::run(int show_command)
 {
 	ShowWindow(m_main, show_command);
-
-
+	ShowWindow(m_screen, show_command);
 	MSG msg{};
 	BOOL result = TRUE;
 
@@ -215,4 +221,30 @@ int app::run(int show_command)
 
 	}
 	return EXIT_SUCCESS;
+}
+bool app::registerScreen_class()
+{
+	WNDCLASSEXW desc{};
+	if (GetClassInfoExW(m_instance, screen_class_name.c_str(), &desc) != 0)
+		return true;
+	desc = {
+	.cbSize = sizeof(WNDCLASSEXW),
+	.lpfnWndProc = app::window_proc_static,
+	.hInstance = m_instance,
+
+	.hCursor = LoadCursorW(nullptr,L"IDC_ARROW"),
+	.hbrBackground = CreateSolidBrush(RGB(255,255,255)),
+	.lpszMenuName = nullptr,
+	.lpszClassName = screen_class_name.c_str(),
+	};
+	return RegisterClassExW(&desc) != 0;
+}
+
+void app::create_screen_window()
+{
+	int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+	HWND window = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT,screen_class_name.c_str(), L"screen", WS_OVERLAPPED | WS_POPUP, 0, 0, screenWidth, screenHeight, nullptr, nullptr, m_instance, this);
+	SetLayeredWindowAttributes(window, 0, 255 * 20 / 100, LWA_ALPHA);
+	m_screen = window;
 }

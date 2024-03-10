@@ -8,8 +8,9 @@ int WINAPI wWinMain(HINSTANCE instance,
 	int show_command)
 {
 	app app{ instance };
+
 	// odpalic wi innym watku
-	screenWindow screen{ instance };
+
 	return app.run(show_command);
 
 }
