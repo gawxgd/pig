@@ -1,13 +1,15 @@
 ﻿#include "app.h"
 #include <stdexcept>
 #include <time.h>
-//#include "resource.h"
+#include "resource.h"
 
 #define ID_TIMER1 1
 #define ID_TIMER2 2
 #define F4 2
 #define ALTC 3
 #define F12 4
+#define trayID 1
+#define trayMessage WM_USER + 1
 std::wstring const app::s_class_name{ L"app window" };
 std::wstring const app::screen_class_name{ L"screen window" };
 
@@ -57,6 +59,17 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 		int wmId = LOWORD(wparam);
 		switch (wmId)
 		{
+		case 1:
+			DestroyWindow(m_main);
+			break;
+		case 2: //ini config
+			break;
+		case 3:
+			//reload config
+			break;
+		case 4:
+			chooseColor();
+			break;
 			
 		default:
 			return DefWindowProc(window, message, wparam, lparam);
@@ -151,6 +164,17 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 
 			}
 			break;
+		case trayMessage:
+
+			switch (LOWORD(lparam))
+			{
+			case WM_RBUTTONUP:
+				GetCursorPos(&Mousepoint);
+
+				show_tray_menu();
+				break;
+			}
+			break;
 		case WM_PAINT: 
 			PAINTSTRUCT ps;
 			HDC hdc = BeginPaint(m_screen, &ps);
@@ -161,6 +185,8 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 				DrawText(hdc, L"Pomoc ctrl f12 wylacz", -1, &textRect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 			EndPaint(m_screen, &ps);
 			break;
+		
+		
 
 	}
 
@@ -193,7 +219,7 @@ HWND app::create_window(DWORD style)
 }
 void app::RegisterHot()
 {
-	if (RegisterHotKey(NULL, ALTC,MOD_ALT | MOD_SHIFT, 'C'))
+	if (RegisterHotKey(m_screen, ALTC,MOD_ALT | MOD_SHIFT, 'C'))
 	{
 		// Hotkey registered successfully
 	}
@@ -201,7 +227,7 @@ void app::RegisterHot()
 	{
 		ShowErrorMessageBox(GetLastError());
 	}
-	if (RegisterHotKey(NULL, F4, MOD_ALT | MOD_SHIFT, VK_F4))
+	if (RegisterHotKey(m_screen, F4, MOD_ALT | MOD_SHIFT, VK_F4))
 	{
 		// Hotkey registered successfully
 	}
@@ -248,14 +274,13 @@ void app::ShowErrorMessageBox(DWORD errorCode)
 }
 void app::create_notify()
 {
+	ZeroMemory(&nid, sizeof(NOTIFYICONDATA));
 	nid.cbSize = sizeof(NOTIFYICONDATA);
-	nid.hWnd = NULL;
-	nid.uID = 1;
+	nid.hWnd = m_screen;
+	nid.uID = trayID;
 	nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-	nid.uCallbackMessage = WM_USER + 1;
-	nid.hIcon = LoadIcon(m_instance, IDI_APPLICATION);
-	
-
+	nid.uCallbackMessage = trayMessage;
+	nid.hIcon = LoadIcon(m_instance, MAKEINTRESOURCE(IDI_ICON1));
 	Shell_NotifyIcon(NIM_ADD, &nid);
 }
 app::app(HINSTANCE instance) : m_instance{ instance }
@@ -285,12 +310,32 @@ void app::chooseColor()
 	}
 }
 
+
+
+void app::show_tray_menu()
+{
+	HMENU hMenu = CreatePopupMenu();
+	if (hMenu)
+	{
+		InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 1, L"Exit");
+		InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 2, L"Open config file");
+		InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 3, L"Reload config");
+		InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 4, L"Pick color");
+
+		SetForegroundWindow(m_screen);
+		TrackPopupMenu(hMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN, Mousepoint.x, Mousepoint.y, 0,m_screen , NULL);
+		
+		PostMessage(m_screen, WM_NULL, 0, 0);
+
+		DestroyMenu(hMenu);
+	}
+}
+
 int app::run(int show_command)
 {
 	//ShowWindow(m_main, show_command);
 	ShowWindow(m_screen, show_command);
 	create_notify();
-	chooseColor();
 	MSG msg{};
 	BOOL result = TRUE;
 

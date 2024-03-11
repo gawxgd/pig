@@ -32,6 +32,8 @@ public:
 	
 	NOTIFYICONDATA nid;
 	void create_notify();
+	void show_tray_menu();
+	POINT Mousepoint;
 	void chooseColor();
 	CHOOSECOLOR cc;                 
 	COLORREF acrCustClr[16];
