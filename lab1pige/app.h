@@ -5,6 +5,7 @@
 #include <ctime>
 #include "screenWindow.h"
 #include <shellapi.h>
+
 #define pocisk_count 5
 class app
 {
@@ -27,6 +28,9 @@ public:
 	void create_screen_window();
 	HWND m_screen;
 	RECT circleRect;
+	int circleSize;
+	int circleMax;
+	int circleMin;
 	RECT textRect = { 0,0,200,200 };
 	bool help;
 	
@@ -37,10 +41,12 @@ public:
 	void chooseColor();
 	CHOOSECOLOR cc;                 
 	COLORREF acrCustClr[16];
-	HBRUSH hbrush;                  // brush handle
+	HBRUSH hbrush;         // brush handle
 	DWORD rgbCurrent;
 
-
+	void openConfigIni();
+	void LoadConfigIni();
+	std::wstring helpString;
 
 	app(HINSTANCE instance);
 	int run(int show_command);

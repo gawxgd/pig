@@ -10,6 +10,8 @@
 #define F12 4
 #define trayID 1
 #define trayMessage WM_USER + 1
+
+
 std::wstring const app::s_class_name{ L"app window" };
 std::wstring const app::screen_class_name{ L"screen window" };
 
@@ -62,10 +64,11 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 		case 1:
 			DestroyWindow(m_main);
 			break;
-		case 2: //ini config
+		case 2: 
+			openConfigIni();
 			break;
 		case 3:
-			//reload config
+			LoadConfigIni();
 			break;
 		case 4:
 			chooseColor();
@@ -93,43 +96,19 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 		{
 			if (sizeCount == 1)
 			{
-				change += 10;
-				//SetWindowRgn(window, CreateEllipticRgn(0, 0, change, change), TRUE);
-				/*int centerX = (circleRect.left + circleRect.right) / 2;
-				int centerY = (circleRect.top + circleRect.bottom) / 2;
-				int left = centerX - change / 2;
-				int top = centerY - change / 2;
-				int right = centerX + change / 2;
-				int bottom = centerY + change / 2;
-				circleRect.left = left;
-				circleRect.right = right;
-				circleRect.top = top;
-				circleRect.bottom = bottom;
-
-				InvalidateRect(m_screen, NULL, TRUE);
-				UpdateWindow(m_screen);*/
-
-				if(change >= 100)
+				circleSize += 2 * (circleMax - circleMin) / 100;
+				if(circleSize >= circleMax)
 					sizeCount = 0;
 			}
 			else if (sizeCount == 0)
 			{
-				change -= 10;
-				//SetWindowRgn(window, CreateEllipticRgn(0, 0, change, change), TRUE);
-				/*int centerX = (circleRect.left + circleRect.right) / 2;
-				int centerY = (circleRect.top + circleRect.bottom) / 2;
-				int left = centerX - change / 2;
-				int top = centerY - change / 2;
-				int right = centerX + change / 2;
-				int bottom = centerY + change / 2;
-				circleRect.left = left;
-				circleRect.right = right;
-				circleRect.top = top;
-				circleRect.bottom = bottom;
-				InvalidateRect(m_screen, NULL, TRUE);
-				UpdateWindow(m_screen);*/
-			
+				circleSize -= 2 * (circleMax - circleMin) / 100;
+				if (circleSize <= circleMax)
+					sizeCount = 1;
 			}
+			InvalidateRect(m_screen, NULL, TRUE);
+			UpdateWindow(m_screen);
+
 			
 		}
 		else if (wparam == ID_TIMER1)
@@ -143,25 +122,26 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 			circleRect.bottom = circleRect.top + 100;
 			InvalidateRect(m_screen, NULL, TRUE);
 			UpdateWindow(m_screen);
-			//SetWindowPos(m_main, NULL, pos.x - change / 4 , pos.y - change / 4, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 		}
 		break;
 		case WM_HOTKEY:
 			switch (static_cast<int>(wparam))
 			{
 				case F4:
-					ShowErrorMessageBox(0);
-
-					//PostQuitMessage(EXIT_SUCCESS);
+					PostQuitMessage(EXIT_SUCCESS);
 					break;
 				case ALTC:
-					pulse = false;
-					ShowErrorMessageBox(0);
+					if (pulse == false)
+						pulse = true;
+					else
+						pulse = false;
 					break;
 				case F12:
-					help = false;
+					if (help == false)
+						help = true;
+					else
+						help = false;
 					break;
-
 			}
 			break;
 		case trayMessage:
@@ -180,9 +160,9 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 			HDC hdc = BeginPaint(m_screen, &ps);
 			
 			SelectObject(hdc, hbrush);
-			Ellipse(hdc, circleRect.left, circleRect.top, circleRect.right, circleRect.bottom);
+			Ellipse(hdc, circleRect.left - circleSize / 2, circleRect.top - circleSize / 2, circleRect.right + circleSize / 2, circleRect.bottom + circleSize / 2);
 			if(help)
-				DrawText(hdc, L"Pomoc ctrl f12 wylacz", -1, &textRect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+				DrawText(hdc,helpString.c_str(), -1, &textRect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 			EndPaint(m_screen, &ps);
 			break;
 		
@@ -206,14 +186,14 @@ HWND app::create_window(DWORD style)
 	circleRect.top = y - 50;
 	circleRect.right = circleRect.left + 100;
 	circleRect.bottom = circleRect.top + 100;
+	circleSize = 100;
+	circleMax = 100;
+	circleMin = 50;
 	HWND window = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT, s_class_name.c_str(), L"circle", style, x - 50 , y - 50 , 100, 100, nullptr, nullptr, m_instance, this);
-	//SetCapture(window);
 	SetTimer(window, ID_TIMER1, 5, NULL);
 	SetTimer(window, ID_TIMER2, 100, NULL);
-	//RegisterHot();
 	SetLayeredWindowAttributes(window, 0, 255 * 80 / 100, LWA_ALPHA);
 	SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-	//SetWindowRgn(window, CreateEllipticRgn(0,0,100,100), TRUE);
 
 	return window;
 }
@@ -292,6 +272,7 @@ app::app(HINSTANCE instance) : m_instance{ instance }
 	create_screen_window();
 	help = true;
 	hbrush = CreateSolidBrush(RGB(255, 255, 0));
+	helpString = L"Pomoc ctrl f12 wylacz";
 
 }
 
@@ -330,12 +311,39 @@ void app::show_tray_menu()
 		DestroyMenu(hMenu);
 	}
 }
+void app::openConfigIni()
+{
+	LPCWSTR filePath = L"config.ini";
+	auto shellEror = ShellExecute(NULL, L"open",filePath, NULL, NULL, SW_SHOW);
+	if (!shellEror)
+	{
+		auto dwError = GetLastError();
+		ShowErrorMessageBox(dwError);
+	}
+}
+
+void app::LoadConfigIni()
+{
+	LPCWSTR fileName = L"config.ini";
+	LPCWSTR section = L"Help"; 
+	LPCWSTR key = L"desc"; 
+	WCHAR buffer[256]; 
+	DWORD bytesRead = GetPrivateProfileString(section, key, L"", buffer, ARRAYSIZE(buffer), fileName);
+	std::wstring helpString(buffer);
+
+	if (bytesRead < 0) 
+	{
+		ShowErrorMessageBox(0);
+	}
+}
 
 int app::run(int show_command)
 {
 	//ShowWindow(m_main, show_command);
 	ShowWindow(m_screen, show_command);
 	create_notify();
+	RegisterHot();
+
 	MSG msg{};
 	BOOL result = TRUE;
 
@@ -376,5 +384,7 @@ void app::create_screen_window()
 	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 	HWND window = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT,screen_class_name.c_str(), L"screen", WS_OVERLAPPED | WS_POPUP, 0, 0, screenWidth, screenHeight, nullptr, nullptr, m_instance, this);
 	SetLayeredWindowAttributes(window, 0, 255 * 20 / 100, LWA_ALPHA);
+	SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
 	m_screen = window;
 }
