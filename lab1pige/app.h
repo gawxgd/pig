@@ -5,6 +5,8 @@
 #include <ctime>
 #include "screenWindow.h"
 #include <shellapi.h>
+#include <Shlwapi.h>
+#pragma comment(lib, "Shlwapi.lib")
 
 #define pocisk_count 5
 class app

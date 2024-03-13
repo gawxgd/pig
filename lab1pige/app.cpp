@@ -96,14 +96,14 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 		{
 			if (sizeCount == 1)
 			{
-				circleSize += 2 * (circleMax - circleMin) / 100;
+				circleSize += 20;
 				if(circleSize >= circleMax)
 					sizeCount = 0;
 			}
 			else if (sizeCount == 0)
 			{
-				circleSize -= 2 * (circleMax - circleMin) / 100;
-				if (circleSize <= circleMax)
+				circleSize -= 20;
+				if (circleSize <= circleMin)
 					sizeCount = 1;
 			}
 			InvalidateRect(m_screen, NULL, TRUE);
@@ -155,14 +155,55 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 				break;
 			}
 			break;
+		case WM_ERASEBKGND:
+			return 1;
 		case WM_PAINT: 
 			PAINTSTRUCT ps;
+			// stackoverflow
+			// create memory DC and memory bitmap where we shall do our drawing
 			HDC hdc = BeginPaint(m_screen, &ps);
+			HDC memDC = CreateCompatibleDC(hdc);
+
+			// get window's client rectangle. We need this for bitmap creation.
+			RECT rcClientRect;
+			GetClientRect(m_screen, &rcClientRect);
+
+			// now we can create bitmap where we shall do our drawing
+			HBITMAP bmp = CreateCompatibleBitmap(hdc,
+				rcClientRect.right - rcClientRect.left,
+				rcClientRect.bottom - rcClientRect.top);
+
+			// we need to save original bitmap, and select it back when we are done,
+			// in order to avoid GDI leaks!
+			HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, bmp);
+
+			// now you draw your stuff in memory dc; 
+			// just substitute hdc with memDC in your drawing code, 
+			// like I did below:
 			
-			SelectObject(hdc, hbrush);
-			Ellipse(hdc, circleRect.left - circleSize / 2, circleRect.top - circleSize / 2, circleRect.right + circleSize / 2, circleRect.bottom + circleSize / 2);
-			if(help)
-				DrawText(hdc,helpString.c_str(), -1, &textRect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+			
+			SelectObject(memDC, hbrush);
+			SetBkMode(memDC, TRANSPARENT);
+			BLENDFUNCTION blendFunction = { AC_SRC_OVER, 0, static_cast<BYTE>(128), AC_SRC_ALPHA };
+			Ellipse(memDC, circleRect.left - circleSize / 2, circleRect.top - circleSize / 2, circleRect.right + circleSize / 2, circleRect.bottom + circleSize / 2);
+			if (help)
+			{
+				SetBkMode(memDC, OPAQUE);
+				SetBkColor(memDC, RGB(255, 255, 255)); // White background with 50% transparency
+				ExtTextOut(memDC, 0, 0, ETO_OPAQUE, &textRect, nullptr, 0, nullptr);
+
+				// Draw text
+				SetTextColor(memDC, RGB(0, 0, 0)); // Black text color
+				SetBkMode(memDC, TRANSPARENT);
+				DrawText(memDC, helpString.c_str(), -1, &textRect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+			}
+			BitBlt(hdc, 0, 0, rcClientRect.right - rcClientRect.left,
+				rcClientRect.bottom - rcClientRect.top, memDC, 0, 0, SRCCOPY);
+			// all done, now we need to cleanup
+			SelectObject(memDC, oldBmp); // select back original bitmap
+			DeleteObject(bmp); // delete bitmap since it is no longer required
+			DeleteDC(memDC);   // delete memory DC since it is no longer required
+			//UpdateLayeredWindow(m_screen,hdc)
 			EndPaint(m_screen, &ps);
 			break;
 		
@@ -186,13 +227,13 @@ HWND app::create_window(DWORD style)
 	circleRect.top = y - 50;
 	circleRect.right = circleRect.left + 100;
 	circleRect.bottom = circleRect.top + 100;
-	circleSize = 100;
-	circleMax = 100;
+	circleSize = 50;
+	circleMax = 75;
 	circleMin = 50;
 	HWND window = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT, s_class_name.c_str(), L"circle", style, x - 50 , y - 50 , 100, 100, nullptr, nullptr, m_instance, this);
 	SetTimer(window, ID_TIMER1, 5, NULL);
-	SetTimer(window, ID_TIMER2, 100, NULL);
-	SetLayeredWindowAttributes(window, 0, 255 * 80 / 100, LWA_ALPHA);
+	SetTimer(window, ID_TIMER2, 500, NULL);
+	//SetLayeredWindowAttributes(window, 0, 255 * 80 / 100, LWA_ALPHA);
 	SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
 	return window;
@@ -313,8 +354,12 @@ void app::show_tray_menu()
 }
 void app::openConfigIni()
 {
-	LPCWSTR filePath = L"config.ini";
-	auto shellEror = ShellExecute(NULL, L"open",filePath, NULL, NULL, SW_SHOW);
+	LPCWSTR Path = L"config.ini";
+	WCHAR filepath[MAX_PATH];
+	GetModuleFileName(NULL,filepath, MAX_PATH);
+	PathRemoveFileSpec(filepath);
+	PathAppend(filepath, Path);
+	auto shellEror = ShellExecute(NULL, L"open",filepath, NULL, NULL, SW_SHOW);
 	if (!shellEror)
 	{
 		auto dwError = GetLastError();
@@ -324,11 +369,15 @@ void app::openConfigIni()
 
 void app::LoadConfigIni()
 {
-	LPCWSTR fileName = L"config.ini";
+	LPCWSTR Path = L"config.ini";
+	WCHAR filepath[MAX_PATH];
+	GetModuleFileName(NULL, filepath, MAX_PATH);
+	PathRemoveFileSpec(filepath);
+	PathAppend(filepath, Path);
 	LPCWSTR section = L"Help"; 
 	LPCWSTR key = L"desc"; 
 	WCHAR buffer[256]; 
-	DWORD bytesRead = GetPrivateProfileString(section, key, L"", buffer, ARRAYSIZE(buffer), fileName);
+	DWORD bytesRead = GetPrivateProfileString(section, key, L"", buffer, ARRAYSIZE(buffer), filepath);
 	std::wstring helpString(buffer);
 
 	if (bytesRead < 0) 
@@ -383,7 +432,7 @@ void app::create_screen_window()
 	int screenWidth = GetSystemMetrics(SM_CXSCREEN);
 	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 	HWND window = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT,screen_class_name.c_str(), L"screen", WS_OVERLAPPED | WS_POPUP, 0, 0, screenWidth, screenHeight, nullptr, nullptr, m_instance, this);
-	SetLayeredWindowAttributes(window, 0, 255 * 20 / 100, LWA_ALPHA);
+	SetLayeredWindowAttributes(window, 0, 128, LWA_ALPHA);
 	SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
 	m_screen = window;
