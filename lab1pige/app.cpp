@@ -208,7 +208,7 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 				int it = 0;
 				for (const auto& key : keyQueue) 
 				{
-					if (it <= MAX_KEYS - 5)
+					if (it < MAX_KEYS)
 					{
 						DrawText(memDC, key.c_str(), -1, &temp, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 						temp.top += 30;
@@ -459,7 +459,7 @@ void app::create_screen_window()
 {
 	int screenWidth = GetSystemMetrics(SM_CXSCREEN);
 	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-	keyRect = { 0,screenHeight - 200,200,screenHeight};
+	keyRect = { 0,screenHeight - 250,200,screenHeight};
 	hookDisplay = true;
 	HWND window = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT,screen_class_name.c_str(), L"screen", WS_OVERLAPPED | WS_POPUP, 0, 0, screenWidth, screenHeight, nullptr, nullptr, m_instance, this);
 	SetLayeredWindowAttributes(window, 0, 128, LWA_ALPHA);
@@ -485,11 +485,9 @@ LRESULT app::HandleKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 	{
 		KBDLLHOOKSTRUCT* kbdStruct = (KBDLLHOOKSTRUCT*)lParam;
 		std::wstring keyInfo;
-		WCHAR keyName[256];
 
 		switch (wParam) {
 		case WM_KEYDOWN:
-			//int length = GetKeyNameTextW(kbdStruct->vkCode << 16, keyName, 255);
 		case WM_SYSKEYDOWN:
 			if (kbdStruct->vkCode == VK_CONTROL)
 				keyInfo = L"Ctrl+";
@@ -504,8 +502,8 @@ LRESULT app::HandleKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 		int length = keyInfo.length();
 		if (length > 0)
 		{
-			keyQueue.push_front(keyName);
-			InvalidateRect(m_screen, nullptr, TRUE); // Trigger a repaint
+			keyQueue.push_front(keyInfo);
+			InvalidateRect(m_screen, nullptr, TRUE); 
 		}
 	}
 
