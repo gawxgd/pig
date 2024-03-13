@@ -1,14 +1,16 @@
 #pragma once
 
+#include <deque>
 #include <windows.h>
 #include <string>
 #include <ctime>
 #include "screenWindow.h"
 #include <shellapi.h>
 #include <Shlwapi.h>
+
 #pragma comment(lib, "Shlwapi.lib")
 
-#define pocisk_count 5
+#define MAX_KEYS 10
 class app
 {
 public:
@@ -50,6 +52,17 @@ public:
 	void LoadConfigIni();
 	std::wstring helpString;
 
+	std::deque<std::wstring> keyQueue;
+	HHOOK hHook = NULL;
+	bool hookDisplay;
+	RECT keyRect;
+	void InstallKeyboardHook();
+	void UninstallKeyboardHook();
+	static app* s_appInstance;
+	
+	LRESULT HandleKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
+	static LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
+	
 	app(HINSTANCE instance);
 	int run(int show_command);
 	~app() {}

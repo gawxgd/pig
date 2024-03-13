@@ -53,7 +53,6 @@ LRESULT app::window_proc_static(HWND window, UINT message, WPARAM wparam, LPARAM
 
 LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
-	static bool dragged = false;
 	switch (message)
 	{
 	case WM_COMMAND:
@@ -189,13 +188,38 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 			if (help)
 			{
 				SetBkMode(memDC, OPAQUE);
-				SetBkColor(memDC, RGB(255, 255, 255)); // White background with 50% transparency
+				SetBkColor(memDC, RGB(255, 255, 255)); 
 				ExtTextOut(memDC, 0, 0, ETO_OPAQUE, &textRect, nullptr, 0, nullptr);
 
-				// Draw text
-				SetTextColor(memDC, RGB(0, 0, 0)); // Black text color
+				SetTextColor(memDC, RGB(0, 0, 0)); 
 				SetBkMode(memDC, TRANSPARENT);
 				DrawText(memDC, helpString.c_str(), -1, &textRect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+			}
+			if (hookDisplay)
+			{
+				SetBkMode(memDC, OPAQUE);
+				SetBkColor(memDC, RGB(255, 255, 255));
+				ExtTextOut(memDC, 0, 0, ETO_OPAQUE, &keyRect, nullptr, 0, nullptr);
+
+				SetTextColor(memDC, RGB(0, 0, 0));
+				SetBkMode(memDC, TRANSPARENT);
+				RECT temp = keyRect;
+				temp.top = keyRect.top - 100;
+				int it = 0;
+				for (const auto& key : keyQueue) 
+				{
+					if (it <= MAX_KEYS - 5)
+					{
+						DrawText(memDC, key.c_str(), -1, &temp, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+						temp.top += 30;
+						it++;
+					}
+					else
+					{
+						keyQueue.pop_back();
+						it--;
+					}
+				}
 			}
 			BitBlt(hdc, 0, 0, rcClientRect.right - rcClientRect.left,
 				rcClientRect.bottom - rcClientRect.top, memDC, 0, 0, SRCCOPY);
@@ -314,8 +338,10 @@ app::app(HINSTANCE instance) : m_instance{ instance }
 	help = true;
 	hbrush = CreateSolidBrush(RGB(255, 255, 0));
 	helpString = L"Pomoc ctrl f12 wylacz";
+	s_appInstance = this;
 
 }
+app* app::s_appInstance = nullptr;
 
 void app::chooseColor()
 {
@@ -392,6 +418,7 @@ int app::run(int show_command)
 	ShowWindow(m_screen, show_command);
 	create_notify();
 	RegisterHot();
+	InstallKeyboardHook();
 
 	MSG msg{};
 	BOOL result = TRUE;
@@ -407,6 +434,7 @@ int app::run(int show_command)
 
 	}
 	Shell_NotifyIcon(NIM_DELETE, &nid);
+	UninstallKeyboardHook();
 	return EXIT_SUCCESS;
 }
 bool app::registerScreen_class()
@@ -431,9 +459,67 @@ void app::create_screen_window()
 {
 	int screenWidth = GetSystemMetrics(SM_CXSCREEN);
 	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+	keyRect = { 0,screenHeight - 200,200,screenHeight};
+	hookDisplay = true;
 	HWND window = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT,screen_class_name.c_str(), L"screen", WS_OVERLAPPED | WS_POPUP, 0, 0, screenWidth, screenHeight, nullptr, nullptr, m_instance, this);
 	SetLayeredWindowAttributes(window, 0, 128, LWA_ALPHA);
 	SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-
 	m_screen = window;
+}
+
+void app::InstallKeyboardHook() 
+{
+	hHook = SetWindowsHookEx(WH_KEYBOARD_LL,&app::KeyboardProc, NULL, 0);
+}
+
+void app::UninstallKeyboardHook() {
+	if (hHook != NULL) {
+		UnhookWindowsHookEx(hHook);
+		hHook = NULL;
+	}
+}
+
+LRESULT app::HandleKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+	if (nCode >= 0) 
+	{
+		KBDLLHOOKSTRUCT* kbdStruct = (KBDLLHOOKSTRUCT*)lParam;
+		std::wstring keyInfo;
+		WCHAR keyName[256];
+
+		switch (wParam) {
+		case WM_KEYDOWN:
+			//int length = GetKeyNameTextW(kbdStruct->vkCode << 16, keyName, 255);
+		case WM_SYSKEYDOWN:
+			if (kbdStruct->vkCode == VK_CONTROL)
+				keyInfo = L"Ctrl+";
+			else if (kbdStruct->vkCode == VK_SHIFT)
+				keyInfo = L"Shift+";
+			else if (kbdStruct->vkCode == VK_MENU)
+				keyInfo = L"Alt+";
+			else
+				keyInfo = std::wstring(1, char(kbdStruct->vkCode));
+			break;
+		}
+		int length = keyInfo.length();
+		if (length > 0)
+		{
+			keyQueue.push_front(keyName);
+			InvalidateRect(m_screen, nullptr, TRUE); // Trigger a repaint
+		}
+	}
+
+
+	return CallNextHookEx(NULL, nCode, wParam, lParam);
+}
+LRESULT CALLBACK app::KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+	if (s_appInstance)
+	{
+		return s_appInstance->HandleKeyboardProc(nCode, wParam, lParam);
+	}
+	else
+	{
+		return CallNextHookEx(NULL, nCode, wParam, lParam);
+	}
 }
