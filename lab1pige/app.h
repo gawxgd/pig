@@ -7,6 +7,7 @@
 #include "screenWindow.h"
 #include <shellapi.h>
 #include <Shlwapi.h>
+#include <WinBase.h>
 
 #pragma comment(lib, "Shlwapi.lib")
 
@@ -59,6 +60,10 @@ public:
 	void InstallKeyboardHook();
 	void UninstallKeyboardHook();
 	static app* s_appInstance;
+	bool specialKey;
+	std::wstring specialString;
+	bool timerSet;
+	int timerID;
 	
 	LRESULT HandleKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 	static LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);

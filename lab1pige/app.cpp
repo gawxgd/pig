@@ -10,7 +10,7 @@
 #define F12 4
 #define trayID 1
 #define trayMessage WM_USER + 1
-
+#define ID_TIMER_KEY 3
 
 std::wstring const app::s_class_name{ L"app window" };
 std::wstring const app::screen_class_name{ L"screen window" };
@@ -95,13 +95,13 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 		{
 			if (sizeCount == 1)
 			{
-				circleSize += 20;
+				circleSize += 5;
 				if(circleSize >= circleMax)
 					sizeCount = 0;
 			}
 			else if (sizeCount == 0)
 			{
-				circleSize -= 20;
+				circleSize -= 5;
 				if (circleSize <= circleMin)
 					sizeCount = 1;
 			}
@@ -121,6 +121,12 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 			circleRect.bottom = circleRect.top + 100;
 			InvalidateRect(m_screen, NULL, TRUE);
 			UpdateWindow(m_screen);
+		}
+		else if (wparam == ID_TIMER_KEY)
+		{
+			keyQueue.clear();
+			/*timerSet = false;
+			KillTimer(m_screen, ID_TIMER_KEY);*/
 		}
 		break;
 		case WM_HOTKEY:
@@ -206,19 +212,41 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 				RECT temp = keyRect;
 				temp.top = keyRect.top - 100;
 				int it = 0;
+				bool specialKey = false;
+				std::wstring specialString;
 				for (const auto& key : keyQueue) 
 				{
+					/*if (key.length() - 1 >0 && key[key.length() - 1] == '+')
+					{
+						specialKey = true;
+						specialString = key;
+						continue;
+					}*/
+						
 					if (it < MAX_KEYS)
 					{
-						DrawText(memDC, key.c_str(), -1, &temp, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+						if (specialKey)
+						{
+							specialString.append(key);
+							DrawText(memDC, specialString.c_str(), -1, &temp, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+							specialKey = false;
+							
+						}
+						else
+						{
+							DrawText(memDC, key.c_str(), -1, &temp, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+						}
 						temp.top += 30;
 						it++;
 					}
 					else
 					{
 						keyQueue.pop_back();
+						//KillTimer(m_screen, timerID--);
 						it--;
 					}
+					
+
 				}
 			}
 			BitBlt(hdc, 0, 0, rcClientRect.right - rcClientRect.left,
@@ -256,7 +284,7 @@ HWND app::create_window(DWORD style)
 	circleMin = 50;
 	HWND window = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT, s_class_name.c_str(), L"circle", style, x - 50 , y - 50 , 100, 100, nullptr, nullptr, m_instance, this);
 	SetTimer(window, ID_TIMER1, 5, NULL);
-	SetTimer(window, ID_TIMER2, 500, NULL);
+	SetTimer(window, ID_TIMER2, 100, NULL);
 	//SetLayeredWindowAttributes(window, 0, 255 * 80 / 100, LWA_ALPHA);
 	SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
@@ -385,8 +413,8 @@ void app::openConfigIni()
 	GetModuleFileName(NULL,filepath, MAX_PATH);
 	PathRemoveFileSpec(filepath);
 	PathAppend(filepath, Path);
-	auto shellEror = ShellExecute(NULL, L"open",filepath, NULL, NULL, SW_SHOW);
-	if (!shellEror)
+	auto shellEror = ShellExecute(NULL, L"edit",filepath, NULL, NULL, SW_SHOW);
+	if ((int)shellEror <= 32)
 	{
 		auto dwError = GetLastError();
 		ShowErrorMessageBox(dwError);
@@ -404,12 +432,15 @@ void app::LoadConfigIni()
 	LPCWSTR key = L"desc"; 
 	WCHAR buffer[256]; 
 	DWORD bytesRead = GetPrivateProfileString(section, key, L"", buffer, ARRAYSIZE(buffer), filepath);
-	std::wstring helpString(buffer);
+	helpString = std::wstring(buffer);
 
 	if (bytesRead < 0) 
 	{
-		ShowErrorMessageBox(0);
+		int er = GetLastError();
+		ShowErrorMessageBox(er);
 	}
+	InvalidateRect(m_screen, nullptr, TRUE);
+
 }
 
 int app::run(int show_command)
@@ -470,6 +501,7 @@ void app::create_screen_window()
 void app::InstallKeyboardHook() 
 {
 	hHook = SetWindowsHookEx(WH_KEYBOARD_LL,&app::KeyboardProc, NULL, 0);
+	timerSet = false;
 }
 
 void app::UninstallKeyboardHook() {
@@ -489,12 +521,14 @@ LRESULT app::HandleKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 		switch (wParam) {
 		case WM_KEYDOWN:
 		case WM_SYSKEYDOWN:
-			if (kbdStruct->vkCode == VK_CONTROL)
+			if (kbdStruct->vkCode == VK_RCONTROL || kbdStruct->vkCode == VK_LCONTROL)
 				keyInfo = L"Ctrl+";
-			else if (kbdStruct->vkCode == VK_SHIFT)
+			else if (kbdStruct->vkCode == VK_LSHIFT || kbdStruct->vkCode == VK_RSHIFT)
 				keyInfo = L"Shift+";
-			else if (kbdStruct->vkCode == VK_MENU)
+			else if (kbdStruct->vkCode == VK_LMENU || kbdStruct->vkCode == VK_RMENU)
 				keyInfo = L"Alt+";
+			else if (kbdStruct->vkCode == VK_CAPITAL)
+				keyInfo = L"CAPS+";
 			else
 				keyInfo = std::wstring(1, char(kbdStruct->vkCode));
 			break;
@@ -503,6 +537,17 @@ LRESULT app::HandleKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 		if (length > 0)
 		{
 			keyQueue.push_front(keyInfo);
+			if (!timerSet)
+			{
+				SetTimer(m_screen, ID_TIMER_KEY, 5000, NULL);
+				timerSet = true;
+				timerID = ID_TIMER_KEY;
+			}
+			/*else
+			{
+				timerID++;
+				SetTimer(m_screen, timerID, 5000, NULL);
+			}*/
 			InvalidateRect(m_screen, nullptr, TRUE); 
 		}
 	}
