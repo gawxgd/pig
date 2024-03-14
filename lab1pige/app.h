@@ -53,7 +53,8 @@ public:
 	void LoadConfigIni();
 	std::wstring helpString;
 
-	std::deque<std::wstring> keyQueue;
+	std::deque<std::tuple<std::wstring,int>> keyQueue;
+	int timers[MAX_KEYS];
 	HHOOK hHook = NULL;
 	bool hookDisplay;
 	RECT keyRect;

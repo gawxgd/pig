@@ -122,11 +122,16 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 			InvalidateRect(m_screen, NULL, TRUE);
 			UpdateWindow(m_screen);
 		}
-		else if (wparam == ID_TIMER_KEY)
+		else
 		{
-			keyQueue.clear();
-			/*timerSet = false;
-			KillTimer(m_screen, ID_TIMER_KEY);*/
+			if (!keyQueue.empty())
+			{
+				int tID = get<1>(keyQueue.back());
+				keyQueue.pop_back();
+				KillTimer(m_screen, tID);
+
+			}
+			
 		}
 		break;
 		case WM_HOTKEY:
@@ -227,22 +232,23 @@ LRESULT app::window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam
 					{
 						if (specialKey)
 						{
-							specialString.append(key);
+							specialString.append(get<0>(key));
 							DrawText(memDC, specialString.c_str(), -1, &temp, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 							specialKey = false;
 							
 						}
 						else
 						{
-							DrawText(memDC, key.c_str(), -1, &temp, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+							DrawText(memDC, (get<0>(key)).c_str(), -1, &temp, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 						}
 						temp.top += 30;
 						it++;
 					}
 					else
 					{
+						int tID = get<1>(keyQueue.back());
 						keyQueue.pop_back();
-						//KillTimer(m_screen, timerID--);
+						KillTimer(m_screen, tID);
 						it--;
 					}
 					
@@ -502,6 +508,7 @@ void app::InstallKeyboardHook()
 {
 	hHook = SetWindowsHookEx(WH_KEYBOARD_LL,&app::KeyboardProc, NULL, 0);
 	timerSet = false;
+	timerID = ID_TIMER_KEY;
 }
 
 void app::UninstallKeyboardHook() {
@@ -536,12 +543,11 @@ LRESULT app::HandleKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 		int length = keyInfo.length();
 		if (length > 0)
 		{
-			keyQueue.push_front(keyInfo);
+			int act_timer = (timerID++) % MAX_KEYS;
+			keyQueue.push_front(std::tuple(keyInfo,act_timer));
 			if (!timerSet)
 			{
-				SetTimer(m_screen, ID_TIMER_KEY, 5000, NULL);
-				timerSet = true;
-				timerID = ID_TIMER_KEY;
+				SetTimer(m_screen, act_timer, 5000, NULL);
 			}
 			/*else
 			{
